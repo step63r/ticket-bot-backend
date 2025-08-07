@@ -198,30 +198,68 @@ def lambda_handler(event, context):
         Return doc: https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-lambda-proxy-integrations.html
     """
     print('event', event)
-    body = json.loads(event['body'])
-    for e in body.get('events', []):
-        event_type = e.get('type')
-        if event_type == 'message':     # ユーザーからのメッセージ
-            pass
 
-        elif event_type == 'follow':    # 友だち追加
-            handle_follow(e)
+    try:
+        body = json.loads(event['body'])
+        for e in body.get('events', []):
+            event_type = e.get('type')
+            if event_type == 'message':     # ユーザーからのメッセージ
+                pass
 
-        elif event_type == 'unfollow':  # 友だち解除
-            handle_unfollow(e)
+            elif event_type == 'follow':    # 友だち追加
+                handle_follow(e)
 
-        elif event_type == 'join':      # グループや複数人トークへの参加
-            pass
+            elif event_type == 'unfollow':  # 友だち解除
+                handle_unfollow(e)
 
-        elif event_type == 'leave':     # グループや複数人トークからの退出
-            pass
+            elif event_type == 'join':      # グループや複数人トークへの参加
+                pass
 
-        elif event_type == 'postback':  # リッチメニューなどからのアクション
-            handle_postback(e)
+            elif event_type == 'leave':     # グループや複数人トークからの退出
+                pass
+
+            elif event_type == 'postback':  # リッチメニューなどからのアクション
+                handle_postback(e)
+
+            elif event_type == 'beacon':    # ビーコン検知イベント
+                pass
             
-        elif event_type == 'beacon':    # ビーコン検知イベント
-            pass
-    
+    except Exception as e:
+        # エラーが発生した場合、管理者に通知
+        print('Error:', e)
+        token = get_channel_access_token(
+            get_ssm_parameter('TICKET_LINE_CHANNEL_ID'),
+            get_ssm_parameter('TICKET_LINE_CHANNEL_SECRET')
+        )
+        admin_line_user_id = get_ssm_parameter('TICKET_ADMIN_LINE_USER_ID')
+
+        headers = {
+            'Authorization': f'Bearer {token}',
+            'Content-Type': 'application/json'
+        }
+        message = {
+            'to': admin_line_user_id,
+            'messages': [
+                {
+                    'type': 'text',
+                    'text': f'Error occurred in check_ticket: {str(e)}'
+                }
+            ]
+        }
+        response = requests.post(
+            'https://api.line.me/v2/bot/message/push',
+            headers=headers,
+            json=message
+        )
+        response.raise_for_status()  # エラー時に例外を投げる
+        print('Error notification response:', response.json())
+
+        return {
+            'statusCode': 500,
+            'body': json.dumps({'error': str(e)}),
+            'headers': {'Content-Type': 'application/json'}
+        }
+
     return {
         'statusCode': 200,
         'body': json.dumps({
