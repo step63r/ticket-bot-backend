@@ -7,6 +7,41 @@ dynamodb = boto3.resource('dynamodb')
 ssm = boto3.client('ssm')
 
 
+BUTTON_CHECK_CURRENT_ARTIST = '現在の設定を確認'
+BUTTON_CHANGE_ARTIST = '設定を変更'
+
+
+MESSAGE_SELECT_ARTIST = {
+    "type": "flex",
+    "altText": "アーティストを選択してください。",
+    "contents": {
+        "type": "bubble",
+        "body": {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+                { "type": "text", "text": "対象のアーティストを選択してください", "weight": "bold", "size": "md", "wrap": True },
+                { "type": "button", "action": { "type": "postback", "label": "timelesz", "data": "artist=timelesz" } },
+                { "type": "button", "action": { "type": "postback", "label": "なにわ男子", "data": "artist=naniwa" } },
+                { "type": "button", "action": { "type": "postback", "label": "横山裕", "data": "artist=yokoyama" } },
+                { "type": "button", "action": { "type": "postback", "label": "ジュニア", "data": "artist=jr" } },
+                { "type": "button", "action": { "type": "postback", "label": "NEWS", "data": "artist=news" } }
+            ]
+        }
+    }
+}
+
+
+# アーティスト名と表示名のマッピング
+display_names = {
+    'timelesz': 'timelesz',
+    'naniwa': 'なにわ男子',
+    'yokoyama': '横山裕',
+    'jr': 'ジュニア',
+    'news': 'NEWS'
+}
+
+
 def get_ssm_parameter(name):
     """SSMパラメーターストアからパラメーターを取得する
 
@@ -58,6 +93,67 @@ def get_channel_access_token(channel_id: str, channel_secret: str):
     return token_info['access_token']
 
 
+def handle_message(event: any):
+    """ユーザーからのメッセージイベントの処理
+
+    Parameters
+    ----------
+    event : any
+        イベントデータ
+    """
+    print('handle_message event:', event)
+    user_id = event['source']['userId']
+    reply_token = event['replyToken']
+    message_text = event['message']['text']
+    reply_messages = []
+
+    if message_text == BUTTON_CHECK_CURRENT_ARTIST:
+        # TicketBotUsersからユーザーのアーティスト設定を取得
+        table = dynamodb.Table('TicketBotUsers')
+        response = table.get_item(Key={'userId': user_id})
+        if 'Item' in response:
+            artist = response['Item'].get('artist', '未設定')
+            reply_messages.append({
+                "type": "text",
+                "text": f"現在のアーティスト設定: {display_names.get(artist, artist)}"
+            })
+        else:
+            reply_messages.append({
+                "type": "text",
+                "text": "アーティスト設定が見つかりません。設定を行ってください。"
+            })
+
+    elif message_text == BUTTON_CHANGE_ARTIST:
+        reply_messages.append(MESSAGE_SELECT_ARTIST)
+
+    else:
+        reply_messages.append({
+            "type": "text",
+            "text": "そのメッセージは認識できませんでした。メニューから選択してください。",
+        })
+
+    # ユーザーに返信メッセージを送信
+    token = get_channel_access_token(
+        get_ssm_parameter('TICKET_LINE_CHANNEL_ID'),
+        get_ssm_parameter('TICKET_LINE_CHANNEL_SECRET')
+    )
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'Content-Type': 'application/json'
+    }
+    message = {
+        "replyToken": reply_token,
+        "messages": reply_messages
+    }
+    response = requests.post(
+        'https://api.line.me/v2/bot/message/reply',
+        headers=headers,
+        json=message
+    )
+    response.raise_for_status()  # エラー時に例外を投げる
+    print('handle_message response:', response.json())
+
+
 def handle_follow(event: any):
     """友だち追加イベントの処理
 
@@ -76,28 +172,9 @@ def handle_follow(event: any):
         'Authorization': f'Bearer {token}',
         'Content-Type': 'application/json'
     }
-    flex_message = {
-        "type": "flex",
-        "altText": "アーティストを選択してください。",
-        "contents": {
-            "type": "bubble",
-            "body": {
-                "type": "box",
-                "layout": "vertical",
-                "contents": [
-                    { "type": "text", "text": "対象のアーティストを選択してください", "weight": "bold", "size": "md", "wrap": True },
-                    { "type": "button", "action": { "type": "postback", "label": "timelesz", "data": "artist=timelesz" } },
-                    { "type": "button", "action": { "type": "postback", "label": "なにわ男子", "data": "artist=naniwa" } },
-                    { "type": "button", "action": { "type": "postback", "label": "横山裕", "data": "artist=yokoyama" } },
-                    { "type": "button", "action": { "type": "postback", "label": "ジュニア", "data": "artist=jr" } },
-                    { "type": "button", "action": { "type": "postback", "label": "NEWS", "data": "artist=news" } }
-                ]
-            }
-        }
-    }
     payload = {
         'to': user_id,
-        'messages': [flex_message]
+        'messages': [MESSAGE_SELECT_ARTIST]
     }
     response = requests.post(
         'https://api.line.me/v2/bot/message/push',
@@ -155,7 +232,7 @@ def handle_postback(event: any):
         "messages": [
             {
                 "type": "text",
-                "text": f"アーティスト「{artist}」を登録しました。"
+                "text": f"{display_names[artist]} を登録しました。"
             }
         ]
     }
@@ -204,7 +281,7 @@ def lambda_handler(event, context):
         for e in body.get('events', []):
             event_type = e.get('type')
             if event_type == 'message':     # ユーザーからのメッセージ
-                pass
+                handle_message(e)
 
             elif event_type == 'follow':    # 友だち追加
                 handle_follow(e)
@@ -223,7 +300,7 @@ def lambda_handler(event, context):
 
             elif event_type == 'beacon':    # ビーコン検知イベント
                 pass
-            
+
     except Exception as e:
         # エラーが発生した場合、管理者に通知
         print('Error:', e)
