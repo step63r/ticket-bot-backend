@@ -1,6 +1,7 @@
 import json
 import boto3
 import requests
+import time
 from bs4 import BeautifulSoup
 
 
@@ -48,8 +49,25 @@ def get_ssm_parameter(name):
     return response['Parameter']['Value']
 
 
-def get_channel_access_token(channel_id: str, channel_secret: str):
-    """LINEのステートレスチャネルアクセストークンを取得する
+def get_cached_token():
+    """キャッシュされたアクセストークンを取得する
+
+    Returns
+    -------
+    str
+        キャッシュされたアクセストークン or None
+    """
+    table = dynamodb.Table('TicketAccessTokenCache')
+    response = table.get_item(Key={'token_type': 'channel_access_token'})
+    print('get_cached_token response:', response)
+    item = response.get('Item')
+    if item and item['expires_at'] > int(time.time()):
+        return item['access_token']
+    return None
+
+
+def fetch_new_token(channel_id: str, channel_secret: str):
+    """新しいアクセストークンを取得し、キャッシュに保存する
 
     Parameters
     ----------
@@ -61,7 +79,7 @@ def get_channel_access_token(channel_id: str, channel_secret: str):
     Returns
     -------
     str
-        ステートレスチャネルアクセストークン
+        新しいアクセストークン
     """
     url = "https://api.line.me/v2/oauth/accessToken"
     headers = {
@@ -72,49 +90,47 @@ def get_channel_access_token(channel_id: str, channel_secret: str):
         "client_id": channel_id,
         "client_secret": channel_secret
     }
-
     response = requests.post(url, headers=headers, data=data)
     response.raise_for_status()  # エラー時に例外を投げる
-
+    print('fetch_new_token response:', response.json())
     token_info = response.json()
-    print('get_channel_access_token response:', token_info)
-    return token_info['access_token']
+    access_token = token_info['access_token']
+    expires_in = token_info['expires_in']
+
+    # キャッシュに保存
+    table = dynamodb.Table('TicketAccessTokenCache')
+    item = {
+        'token_type': 'channel_access_token',
+        'access_token': access_token,
+        'expires_at': int(time.time()) + expires_in - 30
+    }
+    table.put_item(Item=item)
+    print('Token cached:', item)
+    return access_token
 
 
-def notify_user(user_id: str, message: str):
-    """LINE Messagine APIを使用してユーザーにメッセージを送信する
+def get_token(channel_id: str, channel_secret: str):
+    """アクセストークンを取得する
 
     Parameters
     ----------
-    user_id : str
-        メッセージを送信するユーザーのID
-    message : str
-        送信するメッセージの内容
+    channel_id : str
+        チャネルID
+    channel_secret : str
+        チャネルシークレット
+
+    Returns
+    -------
+    str
+        アクセストークン
     """
-    token = get_channel_access_token(
-        get_ssm_parameter('TICKET_LINE_CHANNEL_ID'),
-        get_ssm_parameter('TICKET_LINE_CHANNEL_SECRET')
-    )
-    headers = {
-        'Authorization': f'Bearer {token}',
-        'Content-Type': 'application/json'
-    }
-    body = {
-        'to': user_id,
-        'messages': [
-            {
-                'type': 'text',
-                'text': message
-            }
-        ]
-    }
-    response = requests.post(
-        'https://api.line.me/v2/bot/message/push',
-        headers=headers,
-        json=body
-    )
-    response.raise_for_status()  # エラー時に例外を投げる
-    print('notify_user response:', response.json())
+    cached_token = get_cached_token()
+    if cached_token:
+        print('Using cached token')
+        return cached_token
+    else:
+        print('Fetching new token')
+        return fetch_new_token(channel_id, channel_secret)
 
 
 def lambda_handler(event, context):
@@ -142,7 +158,7 @@ def lambda_handler(event, context):
         # 空き状況一覧
         artist_available_tickets = {}
 
-        token = get_channel_access_token(
+        token = get_token(
             get_ssm_parameter('TICKET_LINE_CHANNEL_ID'),
             get_ssm_parameter('TICKET_LINE_CHANNEL_SECRET')
         )
@@ -225,14 +241,14 @@ def lambda_handler(event, context):
                     json=body
                 )
                 response.raise_for_status()  # エラー時に例外を投げる
-                print('notify_user response:', response.json())
+                print('multicast response:', response.json())
             else:
                 print(f"{artist} のチケットは見つかりませんでした")
 
     except Exception as e:
         # エラーが発生した場合、管理者に通知
         print('Error:', e)
-        token = get_channel_access_token(
+        token = get_token(
             get_ssm_parameter('TICKET_LINE_CHANNEL_ID'),
             get_ssm_parameter('TICKET_LINE_CHANNEL_SECRET')
         )
