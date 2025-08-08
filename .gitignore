@@ -159,4 +159,5 @@ env.json
 
 layer/common/python/*
 !layer/common/python/__init__.py
+!layer/common/python/requirements.txt
 !layer/common/python/utils.py

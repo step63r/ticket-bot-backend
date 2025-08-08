@@ -1,14 +1,11 @@
 version = 0.1
 
+[default.deploy.parameters]
+confirm_changeset = false
+stack_name = "stack-ticket-bot"
+resolve_s3 = true
+capabilities = [ "CAPABILITY_IAM", "CAPABILITY_NAMED_IAM" ]
+
 [default.global.parameters]
 stack_name = "stack-ticket-bot"
 region = "ap-northeast-1"
-
-[default.sync.parameters]
-template_file = "c:\\Users\\step6\\Documents\\repos\\github\\ticket-bot-backend\\template.yaml"
-dependency_layer = false
-watch = true
-
-[default.sync.parameters.parameter_overrides]
-TicketLineChannelID = "2007876157"
-TicketLineChannelSecret = "9b6e53067a1a1d2810c23b184bfdfdc6"
