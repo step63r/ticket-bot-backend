@@ -156,3 +156,7 @@ cython_debug/
 
 env.json
 .aws-sam/
+
+layer/common/python/*
+!layer/common/python/__init__.py
+!layer/common/python/utils.py

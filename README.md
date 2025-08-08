@@ -15,12 +15,48 @@ The backend logic for LINE bot to notify _RELIEF Ticket_ Resale platform.
   - DynamoDB
   - Systems Manager
 
+## Python Package Requirements
+
+```
+beautifulsoup4==4.13.4
+boto3==1.40.5
+requests==2.32.4
+```
+
+## SSM (Parameter Store) Requirements
+
+### TICKET_ADMIN_LINE_USER_ID (String)
+
+Specify the LINE user ID to notify of error logs.
+
+### TICKET_LINE_CHANNEL_ID (String)
+
+Specify the LINE channel ID of the bot.
+
+### TICKET_LINE_CHANNEL_SECRET (String)
+
+Specify the LINE channel secret of the bot.
+
 ## Install
 
 Fork and clone this repository.
 
 ```
 $ git clone git@github.com:yourname/ticket-bot-backend.git
+```
+
+Install layer packages.
+
+```
+$ cd ./layer/common
+$ pip install -r ./requirements.txt -t ./python
+```
+
+SAM build and deploy.
+
+```
+$ sam build
+$ sam deploy --guided
 ```
 
 ## Usage

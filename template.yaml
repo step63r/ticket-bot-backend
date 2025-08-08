@@ -83,12 +83,25 @@ Resources:
           LoggingLevel: "INFO"
           DataTraceEnabled: true
           MetricsEnabled: true
+  CommonLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: ticket-bot-common-layer
+      Description: Common utilities for Lambda functions
+      ContentUri: layer/common/
+      CompatibleRuntimes:
+        - python3.13
+      LicenseInfo: "MIT"
   PushNotificationFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: push_notification/
+      CodeUri: lambda-python3.13/push_notification/
       Handler: app.lambda_handler
       Runtime: python3.13
+      Layers:
+        - !Ref CommonLayer
+      MemorySize: 128
+      Timeout: 20
       Architectures:
         - x86_64
       Role: !GetAtt TicketLambdaRole.Arn
@@ -102,9 +115,11 @@ Resources:
   CheckTicketFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: check_ticket/
+      CodeUri: lambda-python3.13/check_ticket/
       Handler: app.lambda_handler
       Runtime: python3.13
+      Layers:
+        - !Ref CommonLayer
       MemorySize: 128
       Timeout: 20
       Architectures:
