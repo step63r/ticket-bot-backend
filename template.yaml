@@ -133,10 +133,10 @@ Resources:
         CheckTicket:
           Type: Schedule
           Properties:
-            Schedule: rate(1 minute)
+            Schedule: rate(5 minutes)
             Name: CheckTicketSchedule
             Description: "Scheduled event to check ticket availability every minute"
-            Enabled: true
+            Enabled: false
 
 # Outputs:
 #   # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function

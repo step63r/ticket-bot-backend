@@ -74,7 +74,7 @@ def lambda_handler(event, context):
                     # 会場
                     perform_place = perform.find('p').text
                     # 「購入手続きへ」ボタン（ない場合もある）
-                    buy_button = perform.find('button', { 'class': 'btn-buy-ticket' })
+                    buy_button = perform.find('button', { 'class': 'btn' })
                     # 「購入手続きへ」ボタンが存在する場合、artist_available_ticketsに日時と会場とURLを追加
                     if buy_button:
                         print('空きあり', artist_name, perform_date, perform_place, f"{base_url}/{event_url}")
