@@ -16,7 +16,9 @@ artists = {
     'naniwa': 16,
     'yokoyama': 14,
     'jr': 15,
-    'news': 24
+    'news': 24,
+    'abc-z': 30,
+    'snowman': 31,
 }
 
 # アーティスト名と表示名のマッピング
@@ -25,7 +27,9 @@ display_names = {
     'naniwa': 'なにわ男子',
     'yokoyama': '横山裕',
     'jr': 'ジュニア',
-    'news': 'NEWS'
+    'news': 'NEWS',
+    'abc-z': 'A.B.C-Z',
+    'snowman': 'Snow Man',
 }
 
 def get_ssm_parameter(name):

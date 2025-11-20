@@ -32,7 +32,9 @@ MESSAGE_SELECT_ARTIST = {
                 { "type": "button", "action": { "type": "postback", "label": "なにわ男子", "data": "artist=naniwa" } },
                 { "type": "button", "action": { "type": "postback", "label": "横山裕", "data": "artist=yokoyama" } },
                 { "type": "button", "action": { "type": "postback", "label": "ジュニア", "data": "artist=jr" } },
-                { "type": "button", "action": { "type": "postback", "label": "NEWS", "data": "artist=news" } }
+                { "type": "button", "action": { "type": "postback", "label": "NEWS", "data": "artist=news" } },
+                { "type": "button", "action": { "type": "postback", "label": "A.B.C-Z", "data": "artist=abc-z" } },
+                { "type": "button", "action": { "type": "postback", "label": "Snow Man", "data": "artist=snowman" } }
             ]
         }
     }

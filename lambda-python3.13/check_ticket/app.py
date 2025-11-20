@@ -2,6 +2,8 @@ import json
 import boto3
 import requests
 from bs4 import BeautifulSoup
+import time
+from boto3.dynamodb.conditions import Key
 
 
 from utils import (
@@ -97,7 +99,7 @@ def lambda_handler(event, context):
                 table = dynamodb.Table('TicketBotUsers')
                 response = table.query(
                     IndexName='artist-index',
-                    KeyConditionExpression=boto3.dynamodb.conditions.Key('artist').eq(artist)
+                    KeyConditionExpression=Key('artist').eq(artist)
                 )
                 print('query response:', response)
                 items = response.get('Items', [])
@@ -106,12 +108,37 @@ def lambda_handler(event, context):
                     print(f"{artist} の登録ユーザーは見つかりませんでした")
                     continue
 
+                # LINE通知をスキップする条件を確認
+                last_notify_table = dynamodb.Table('TicketBotLastNotify')
+                current_time = int(time.time())
+                filtered_user_list = []
+
+                for user_id in user_list:
+                    last_notify_response = last_notify_table.get_item(
+                        Key={
+                            'userId': user_id,
+                            'artist': artist
+                        }
+                    )
+                    last_notify_item = last_notify_response.get('Item')
+                    if last_notify_item:
+                        last_notify_time = last_notify_item.get('EpocTime', 0)
+                        if current_time - last_notify_time < 3600:
+                            print(f"{user_id} への通知はスキップされました（1時間以内に通知済み）")
+                            continue
+
+                    filtered_user_list.append(user_id)
+
+                if not filtered_user_list:
+                    print(f"{artist} の通知対象ユーザーは全てスキップされました")
+                    continue
+
                 headers = {
                     'Authorization': f'Bearer {token}',
                     'Content-Type': 'application/json'
                 }
                 body = {
-                    'to': user_list,
+                    'to': filtered_user_list,
                     'messages': [
                         {
                             'type': 'text',
@@ -126,6 +153,16 @@ def lambda_handler(event, context):
                 )
                 response.raise_for_status()  # エラー時に例外を投げる
                 print('multicast response:', response.json())
+
+                # 通知後に TicketBotLastNotify を更新
+                for user_id in filtered_user_list:
+                    last_notify_table.put_item(
+                        Item={
+                            'userId': user_id,
+                            'artist': artist,
+                            'EpocTime': current_time
+                        }
+                    )
             else:
                 print(f"{artist} のチケットは見つかりませんでした")
 
